@@ -19,7 +19,7 @@
 //   printf '{}' | node .claude/hooks/loop-memory.mjs
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
@@ -38,6 +38,20 @@ await new Promise((done) => {
   process.stdin.on('end', done);
   process.stdin.on('error', done);
 });
+
+// Бейслайн для Stop-хука (stop-journal.mjs): скільки байтів журналу було НА СТАРТІ ходу.
+// Хід, наприкінці якого журнал не виріс, — це хід, про який наступна ітерація не дізнається
+// нічого. Пишемо лише в луп-режимі; tmp/ уже в .gitignore. Збій запису не валить хук —
+// пам'ять важливіша за запобіжник.
+if (process.env.RALPH_FEATURE) {
+  try {
+    mkdirSync(join(ROOT, 'tmp'), { recursive: true });
+    const size = existsSync(JOURNAL) ? statSync(JOURNAL).size : 0;
+    writeFileSync(join(ROOT, 'tmp', 'journal-baseline'), String(size));
+  } catch {
+    // нічого: без бейслайна stop-journal просто мовчатиме (fail-open)
+  }
+}
 
 if (!existsSync(JOURNAL)) process.exit(0);
 const journal = readFileSync(JOURNAL, 'utf8').trim();
