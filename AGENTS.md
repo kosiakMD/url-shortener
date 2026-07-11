@@ -151,6 +151,10 @@ npm run ralph -- --feature qr-codes            # справжній прогін
 `npm run hooks:test` (входить у `verify`); кожен хук ганяється й руками:
 `node .claude/hooks/<file>.mjs --self-test`.
 
+Як влаштовано, як додати новий хук і що робити, коли хук заблокував тебе, —
+[.claude/hooks/README.md](.claude/hooks/README.md). Чому саме хуки і чому промпти
+лишаються — [ADR 0003](docs/adr/0003-hooks-enforce-agent-prohibitions.md).
+
 ## Де що лежить
 
 - `src/` — код (`shorten.js` домен · `app.js` роути · `db.js` БД · `server.js` вхід · `public/` frontend).
