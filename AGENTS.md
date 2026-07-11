@@ -131,6 +131,26 @@ npm run ralph -- --feature qr-codes            # справжній прогін
 **Стеля автономії — коміт у локальну гілку.** `git push` і `git checkout main` заборонені.
 Подробиці, коди виходу й агент-агностика — [loop/README.md](loop/README.md).
 
+## Хуки (Claude Code)
+
+Заборони з промптів додатково стережуть **хуки** — скрипти в `.claude/hooks/`, які Claude Code
+запускає сам на подіях сесії (реєстр — `.claude/settings.json`). Промпт лишається першим шаром
+і єдиним для не-Claude агентів; хук — детермінований другий. Відмова інструмента з причиною —
+це спрацювання запобіжника, а не збій.
+
+| Подія | Файл | Що стереже |
+|---|---|---|
+| `SessionStart` | `loop-memory.mjs` | вливає журнал лупа + факти з git/трекера в контекст ітерації |
+| `PreToolUse` (Bash) | `guard-bash.mjs` | у лупі: `git push`, перемикання гілок, нові npm-залежності, трейлер `SDD-Task:`; завжди: коміт на `main`, `--no-verify` |
+| `PreToolUse` (Edit/Write) | `guard-files.mjs` | `docs/roadmap.md`; `DONE` проти трекера; у лупі — самі хуки й `settings.json` |
+| `PostToolUse` (Edit/Write) | `post-edit.mjs` | одразу після правки: посилання в `*.md` (`links:check --file`), ESLint по зміненому файлу |
+| `Stop` | `stop-journal.mjs` | у лупі: хід не завершується, доки не дописано `loop/JOURNAL.md` |
+
+Строгість залежить від режиму: `RALPH_FEATURE` (виставляє ранер лупа) вмикає повну стелю;
+в інтерактиві людини діють лише універсальні запобіжники. Самоперевірка без токенів і моделі —
+`npm run hooks:test` (входить у `verify`); кожен хук ганяється й руками:
+`node .claude/hooks/<file>.mjs --self-test`.
+
 ## Де що лежить
 
 - `src/` — код (`shorten.js` домен · `app.js` роути · `db.js` БД · `server.js` вхід · `public/` frontend).
