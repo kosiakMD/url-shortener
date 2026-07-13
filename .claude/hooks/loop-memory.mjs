@@ -19,7 +19,7 @@
 //   printf '{}' | node .claude/hooks/loop-memory.mjs
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
@@ -38,6 +38,20 @@ await new Promise((done) => {
   process.stdin.on('end', done);
   process.stdin.on('error', done);
 });
+
+// Baseline for the Stop hook (stop-journal.mjs): how many journal bytes existed AT THE START
+// of the turn. A turn that ends without the journal growing is a turn the next iteration
+// will know nothing about. Written only in loop mode; tmp/ is already in .gitignore.
+// A write failure does not fail the hook — the memory matters more than the safeguard.
+if (process.env.RALPH_FEATURE) {
+  try {
+    mkdirSync(join(ROOT, 'tmp'), { recursive: true });
+    const size = existsSync(JOURNAL) ? statSync(JOURNAL).size : 0;
+    writeFileSync(join(ROOT, 'tmp', 'journal-baseline'), String(size));
+  } catch {
+    // nothing: without a baseline stop-journal simply stays silent (fail-open)
+  }
+}
 
 if (!existsSync(JOURNAL)) process.exit(0);
 const journal = readFileSync(JOURNAL, 'utf8').trim();

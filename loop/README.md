@@ -173,6 +173,11 @@ approval». Виміряно живим прогоном: агент чесно 
 заборонені промптом. Найгірше, що може статися за ніч, — смітна локальна гілка, яку видаляють
 одним рядком.
 
+In Claude Code the same ceiling also holds **mechanically**: the PreToolUse hook
+[guard-bash.mjs](../.claude/hooks/guard-bash.mjs) intercepts the command before it runs and
+denies it with a reason (in loop mode, when the runner has set `RALPH_FEATURE`). The prompt
+remains the second layer — non-Claude agents, which have no hooks, still read it.
+
 Брудне робоче дерево справжній прогін відмовляється чіпати: `exit 2`, доки не передано
 `--allow-dirty`. Перевірка `main` від `--allow-dirty` **не залежить**: обійти її можна лише
 руками, створивши гілку. Сухий прогін дерево не чіпає й тому на брудність не зважає взагалі.

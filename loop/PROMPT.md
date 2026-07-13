@@ -49,6 +49,10 @@ general-purpose або single-agent fallback. Якщо іменованої ро
 
 ## Заборонено
 
+> In Claude Code these prohibitions are additionally enforced by hooks (`.claude/hooks/`) —
+> treat a tool refusal with a reason as a safeguard tripping, not as a malfunction, and do
+> not try to work around it.
+
 - Писати код до червоного тесту.
 - Писати тест або продукт-код із coordinator-контексту замість dispatch іменованої ролі.
 - **Послаблювати чужий тест, щоб він позеленів.** Не проходить, а ти певен, що код правильний, —

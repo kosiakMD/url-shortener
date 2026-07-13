@@ -131,6 +131,30 @@ npm run ralph -- --feature qr-codes            # справжній прогін
 **Стеля автономії — коміт у локальну гілку.** `git push` і `git checkout main` заборонені.
 Подробиці, коди виходу й агент-агностика — [loop/README.md](loop/README.md).
 
+## Hooks (Claude Code)
+
+The prompt prohibitions are additionally enforced by **hooks** — scripts in `.claude/hooks/`
+that Claude Code runs itself on session events (registry — `.claude/settings.json`). The
+prompt stays the first layer and the only one for non-Claude agents; the hook is the
+deterministic second. A tool refusal with a reason is a safeguard tripping, not a malfunction.
+
+| Event | File | What it guards |
+|---|---|---|
+| `SessionStart` | `loop-memory.mjs` | injects the loop journal + git/tracker facts into the iteration's context |
+| `PreToolUse` (Bash) | `guard-bash.mjs` | in the loop: `git push`, branch switching, new npm dependencies, the `SDD-Task:` trailer; always: committing on `main`, `--no-verify` |
+| `PreToolUse` (Edit/Write) | `guard-files.mjs` | `docs/roadmap.md`; `DONE` against the tracker; in the loop — the hooks themselves and `settings.json` |
+| `PostToolUse` (Edit/Write) | `post-edit.mjs` | right after an edit: links in `*.md` (`links:check --file`), ESLint on the changed file |
+| `Stop` | `stop-journal.mjs` | in the loop: the turn does not end until `loop/JOURNAL.md` is appended |
+
+Strictness depends on the mode: `RALPH_FEATURE` (set by the loop runner) enables the full
+ceiling; a human's interactive session keeps only the universal safeguards. Self-check with
+zero tokens and no model — `npm run hooks:test` (part of `verify`); each hook also runs by
+hand: `node .claude/hooks/<file>.mjs --self-test`.
+
+How it works, how to add a new hook, and what to do when a hook blocks you —
+[.claude/hooks/README.md](.claude/hooks/README.md). Why hooks, and why the prompts stay —
+[ADR 0003](docs/adr/0003-hooks-enforce-agent-prohibitions.md).
+
 ## Де що лежить
 
 - `src/` — код (`shorten.js` домен · `app.js` роути · `db.js` БД · `server.js` вхід · `public/` frontend).

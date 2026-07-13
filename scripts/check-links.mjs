@@ -12,6 +12,7 @@
 //   3. Кожен `#якір` збігається із заголовком у файлі-цілі (за правилами GitHub).
 //
 //   npm run links:check
+//   npm run links:check -- --file docs/roadmap.md   # a single file (how the post-edit hook calls it)
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, dirname, extname } from 'node:path';
@@ -111,7 +112,20 @@ let links = 0;
 let wikilinks = 0;
 let broken = 0;
 
-for (const file of mdFiles(REPO)) {
+// `--file <path>` — check a SINGLE file (how the PostToolUse hook post-edit.mjs calls this
+// right after an edit). Exclusions match the full walk: templates and the journal are
+// skipped — a file outside the gate's jurisdiction gets a silent OK, not a false failure.
+const fileFlag = process.argv.indexOf('--file');
+const single = fileFlag !== -1 ? resolve(REPO, process.argv[fileFlag + 1] ?? '') : null;
+
+function filesToCheck() {
+  if (!single) return mdFiles(REPO);
+  if (!single.endsWith('.md') || !existsSync(single)) return [];
+  if (single === JOURNAL || single.startsWith(TEMPLATES)) return [];
+  return [single];
+}
+
+for (const file of filesToCheck()) {
   toProse(readFileSync(file, 'utf8')).forEach((line, i) => {
     if (WIKILINK.test(line)) {
       wikilinks += 1;

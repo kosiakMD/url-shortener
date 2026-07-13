@@ -28,7 +28,8 @@
     "ralph": "node loop/ralph.mjs",
     "eval:self-test": "node practice/task-3-skill-eval/behavioral/eval.mjs --self-test",
     "tools:check": "node scripts/check-tools.mjs",
-    "links:check": "node scripts/check-links.mjs"
+    "links:check": "node scripts/check-links.mjs",
+    "hooks:test": "node .claude/hooks/self-test.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.0",
