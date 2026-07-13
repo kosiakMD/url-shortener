@@ -80,7 +80,7 @@ Key properties, enforced by `npm run hooks:test` (part of the `verify` matrix):
 
 - Developer guide: [.claude/hooks/README.md](../../.claude/hooks/README.md) — how the layer
   works, how to add a hook, troubleshooting.
-- Agent-facing summary: [AGENTS.md](../../AGENTS.md#хуки-claude-code).
+- Agent-facing summary: [AGENTS.md](../../AGENTS.md#hooks-claude-code).
 - Loop ceiling: [loop/README.md](../../loop/README.md#гілка-й-стеля-автономії).
 - Hooks: `.claude/hooks/` → `guard-bash.mjs` · `guard-files.mjs` · `post-edit.mjs` ·
   `stop-journal.mjs` · `loop-memory.mjs`; registry `.claude/settings.json`.

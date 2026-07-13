@@ -1,16 +1,18 @@
-// post-edit.mjs — швидкий фідбек одразу після правки (подія PostToolUse, matcher Edit|Write).
+// post-edit.mjs — fast feedback right after an edit (PostToolUse, matcher Edit|Write).
 //
-// Дотепер помилку в щойно зміненому файлі агент бачив аж на гейті — через N кроків,
-// коли контекст правки вже втрачено. Цей хук повертає її НЕГАЙНО, точково по одному файлу:
+// Until now the agent saw an error in a freshly edited file only at the gate — N steps
+// later, when the context of the edit was already gone. This hook returns it IMMEDIATELY,
+// scoped to the single file:
 //
-//   *.md                      → scripts/check-links.mjs --file <шлях> (wikilinks, биті посилання)
-//   src|tests|scripts|hooks/*.js|.mjs → eslint по цьому файлу
+//   *.md                      → scripts/check-links.mjs --file <path> (wikilinks, broken links)
+//   src|tests|scripts|hooks/*.js|.mjs → eslint on that file
 //
-// Хук НЕ ганяє тести — це робота гейту (`test:fast` жене ранер після ходу, людина — verify).
-// Червона перевірка = exit 2: PostToolUse не скасовує вже зроблену правку, але stderr
-// повертається агентові, і він виправляє, поки файл ще в контексті.
+// The hook does NOT run tests — that is the gate's job (`test:fast` is run by the loop
+// runner after the turn, by a human via verify). A red check = exit 2: PostToolUse cannot
+// undo the edit, but stderr goes back to the agent, who fixes it while the file is still
+// in context.
 //
-// Перевірити руками:
+// Check by hand:
 //   printf '{"tool_input":{"file_path":"README.md"}}' | node .claude/hooks/post-edit.mjs
 //   node .claude/hooks/post-edit.mjs --self-test
 
@@ -20,13 +22,13 @@ import { readStdinJson, deny, allow, hookRoot, run, selfTest, isMain } from './l
 
 const TIMEOUT_MS = 5000;
 
-/** Яку перевірку заслуговує цей шлях? Чиста функція — її ганяє self-test. */
+/** Which check does this path deserve? Pure function — this is what the self-test runs. */
 export function checkKind(relPath) {
   const path = relPath.split(sep).join('/');
   if (path.endsWith('.md')) return 'links';
   const isCode = /\.(js|mjs)$/.test(path)
     && /^(src|tests|scripts|\.claude\/hooks)\//.test(path)
-    && !path.startsWith('src/public/'); // frontend лінтиться повним `npm run lint`, не хуком
+    && !path.startsWith('src/public/'); // the frontend is linted by the full `npm run lint`, not by the hook
   return isCode ? 'lint' : null;
 }
 
@@ -35,10 +37,10 @@ function runSelfTest() {
     { desc: 'md → links', actual: checkKind('docs/roadmap.md'), expected: 'links' },
     { desc: 'src js → lint', actual: checkKind('src/app.js'), expected: 'lint' },
     { desc: 'tests js → lint', actual: checkKind('tests/unit/shorten.test.js'), expected: 'lint' },
-    { desc: 'хук → lint', actual: checkKind('.claude/hooks/lib.mjs'), expected: 'lint' },
-    { desc: 'frontend — не хуком', actual: checkKind('src/public/app.js'), expected: null },
-    { desc: 'json — нічого', actual: checkKind('package.json'), expected: null },
-    { desc: 'корінь js — нічого', actual: checkKind('eslint.config.js'), expected: null },
+    { desc: 'hook → lint', actual: checkKind('.claude/hooks/lib.mjs'), expected: 'lint' },
+    { desc: 'frontend — not the hook\'s job', actual: checkKind('src/public/app.js'), expected: null },
+    { desc: 'json — nothing', actual: checkKind('package.json'), expected: null },
+    { desc: 'root js — nothing', actual: checkKind('eslint.config.js'), expected: null },
   ]);
   process.exit(failures === 0 ? 0 : 1);
 }
@@ -64,22 +66,22 @@ async function main() {
         cwd: root, timeout: TIMEOUT_MS,
       });
       if (!res.ok && res.status !== null) {
-        deny(`Посилання в щойно зміненому ${rel} биті — виправ зараз, поки файл у контексті:\n${res.out.trim()}`);
+        deny(`Links in the just-edited ${rel} are broken — fix them now, while the file is in context:\n${res.out.trim()}`);
       }
     }
 
     if (kind === 'lint') {
-      // Локальний біндер, не npx: npx без кешу ходить у мережу, а хук мусить бути миттєвим.
+      // The local binary, not npx: npx without a cache goes to the network, and a hook must be instant.
       const eslint = join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'eslint.cmd' : 'eslint');
-      if (!existsSync(eslint)) allow(); // чистий клон без node_modules — не паралізуємо
+      if (!existsSync(eslint)) allow(); // a fresh clone without node_modules — do not paralyze
       const res = run(eslint, ['--no-warn-ignored', abs], { cwd: root, timeout: TIMEOUT_MS });
       if (!res.ok && res.status !== null) {
-        deny(`ESLint у щойно зміненому ${rel} — виправ зараз:\n${res.out.trim()}`);
+        deny(`ESLint in the just-edited ${rel} — fix it now:\n${res.out.trim()}`);
       }
     }
-    // res.status === null означає тайм-аут або збій запуску — fail-open за інваріантом.
+    // res.status === null means a timeout or spawn failure — fail open, per the invariant.
   } catch (err) {
-    process.stderr.write(`post-edit: власна помилка, пропускаю (${err?.message})\n`);
+    process.stderr.write(`post-edit: internal error, allowing (${err?.message})\n`);
   }
   allow();
 }

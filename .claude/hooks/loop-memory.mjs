@@ -39,17 +39,17 @@ await new Promise((done) => {
   process.stdin.on('error', done);
 });
 
-// Бейслайн для Stop-хука (stop-journal.mjs): скільки байтів журналу було НА СТАРТІ ходу.
-// Хід, наприкінці якого журнал не виріс, — це хід, про який наступна ітерація не дізнається
-// нічого. Пишемо лише в луп-режимі; tmp/ уже в .gitignore. Збій запису не валить хук —
-// пам'ять важливіша за запобіжник.
+// Baseline for the Stop hook (stop-journal.mjs): how many journal bytes existed AT THE START
+// of the turn. A turn that ends without the journal growing is a turn the next iteration
+// will know nothing about. Written only in loop mode; tmp/ is already in .gitignore.
+// A write failure does not fail the hook — the memory matters more than the safeguard.
 if (process.env.RALPH_FEATURE) {
   try {
     mkdirSync(join(ROOT, 'tmp'), { recursive: true });
     const size = existsSync(JOURNAL) ? statSync(JOURNAL).size : 0;
     writeFileSync(join(ROOT, 'tmp', 'journal-baseline'), String(size));
   } catch {
-    // нічого: без бейслайна stop-journal просто мовчатиме (fail-open)
+    // nothing: without a baseline stop-journal simply stays silent (fail-open)
   }
 }
 

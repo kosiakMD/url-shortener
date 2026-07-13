@@ -1,69 +1,73 @@
-# Хуки — механічний шар заборон
+# Hooks — the mechanical layer of prohibitions
 
-Скрипти цієї теки Claude Code запускає **сам** на подіях сесії (реєстр —
-[`.claude/settings.json`](../settings.json)). Вони перетворюють заборони з промптів
-([loop/PROMPT.md](../../loop/PROMPT.md) §Заборонено, [AGENTS.md](../../AGENTS.md)) на
-детерміновані запобіжники: заборонена дія перехоплюється **в момент виконання**, з причиною,
-яку агент бачить як відмову інструмента.
+Claude Code runs the scripts in this directory **itself**, on session events (registry —
+[`.claude/settings.json`](../settings.json)). They turn the prohibitions from the prompts
+([loop/PROMPT.md](../../loop/PROMPT.md) "Заборонено", [AGENTS.md](../../AGENTS.md)) into
+deterministic safeguards: a forbidden action is intercepted **at the moment of execution**,
+with a reason the agent sees as a tool refusal.
 
-Рішення і альтернативи — [ADR 0003](../../docs/adr/0003-hooks-enforce-agent-prohibitions.md).
-Промпти лишаються першим шаром і єдиним для не-Claude агентів: хук — це страховка, а не
-джерело правди.
+The decision and its alternatives — [ADR 0003](../../docs/adr/0003-hooks-enforce-agent-prohibitions.md).
+The prompts remain the first layer and the only one for non-Claude agents: a hook is a
+backstop, not the source of truth.
 
-## Карта
+## Map
 
-| Подія | Файл | Що робить |
+| Event | File | What it does |
 |---|---|---|
-| `SessionStart` | [loop-memory.mjs](./loop-memory.mjs) | вливає журнал лупа + свіжі факти з git/трекера в контекст ітерації; пише бейслайн розміру журналу в `tmp/journal-baseline` |
-| `PreToolUse` (Bash) | [guard-bash.mjs](./guard-bash.mjs) | у лупі: блокує `git push`, `checkout`/`switch`, `npm install <pkg>`, коміт без `SDD-Task:`; завжди: коміт на `main`, `--no-verify` |
-| `PreToolUse` (Edit/Write) | [guard-files.mjs](./guard-files.mjs) | `docs/roadmap.md` — тільки людина; `DONE` — тільки коли трекер цілі весь `done`; у лупі хуки й `settings.json` недоторканні |
-| `PostToolUse` (Edit/Write) | [post-edit.mjs](./post-edit.mjs) | одразу після правки: посилання в `*.md` (`links:check --file`), ESLint по зміненому файлу |
-| `Stop` | [stop-journal.mjs](./stop-journal.mjs) | у лупі не дає завершити хід, доки `loop/JOURNAL.md` не виріс проти бейслайна |
+| `SessionStart` | [loop-memory.mjs](./loop-memory.mjs) | injects the loop journal + fresh git/tracker facts into the iteration's context; writes the journal-size baseline to `tmp/journal-baseline` |
+| `PreToolUse` (Bash) | [guard-bash.mjs](./guard-bash.mjs) | in the loop: blocks `git push`, `checkout`/`switch`, `npm install <pkg>`, commits without `SDD-Task:`; always: commits on `main`, `--no-verify` |
+| `PreToolUse` (Edit/Write) | [guard-files.mjs](./guard-files.mjs) | `docs/roadmap.md` — humans only; `DONE` — only when the target tracker is fully `done`; in the loop the hooks and `settings.json` are untouchable |
+| `PostToolUse` (Edit/Write) | [post-edit.mjs](./post-edit.mjs) | right after an edit: links in `*.md` (`links:check --file`), ESLint on the changed file |
+| `Stop` | [stop-journal.mjs](./stop-journal.mjs) | in the loop, refuses to end the turn until `loop/JOURNAL.md` has grown past the baseline |
 
-**Луп-режим.** Повна строгість вмикається змінною `RALPH_FEATURE` — її виставляє лише
-`loop/ralph.mjs`. Інтерактивна сесія людини її не має, тож там діють тільки універсальні
-запобіжники (коміт на `main`, `--no-verify`).
+**Loop mode.** Full strictness is switched on by the `RALPH_FEATURE` variable — only
+`loop/ralph.mjs` sets it. A human's interactive session does not have it, so only the
+universal safeguards apply there (commits on `main`, `--no-verify`).
 
-## Механіка (спільна для всіх хуків)
+## Mechanics (shared by all hooks)
 
-- Claude Code шле хукові **JSON у stdin** (`tool_name`, `tool_input`, для Stop —
-  `stop_hook_active`). Не спожити stdin = зависання, тож [lib.mjs](./lib.mjs) робить це завжди.
-- **Блокування** = exit `2` + причина в stderr. Причина пише, ЩО робити замість забороненого —
-  агент має зрозуміти запобіжник, а не битись об нього.
-- **Мовчазний дозвіл** = exit `0` без виводу.
-- **Fail-open**: незрозумілий вхід або власний виняток → попередження в stderr і exit `0`.
-  Зламаний запобіжник не має паралізувати роботу.
-- Корінь репо рахується **від файла хука** (`.claude/hooks/ → ../..`), не з
-  `$CLAUDE_PROJECT_DIR` у рядку команди: ту змінну розкриває шел, і на Windows шлях ламається.
+- Claude Code sends the hook **JSON on stdin** (`tool_name`, `tool_input`, for Stop —
+  `stop_hook_active`). Unconsumed stdin = a hang, so [lib.mjs](./lib.mjs) always drains it.
+- **Blocking** = exit `2` + the reason on stderr. The reason says WHAT to do instead of the
+  forbidden action — the agent should understand the safeguard, not fight it.
+- **Silent allow** = exit `0` with no output.
+- **Fail-open**: unrecognized input or an internal exception → a warning on stderr and exit
+  `0`. A broken safeguard must never paralyze the work.
+- The repo root is resolved **from the hook file itself** (`.claude/hooks/ → ../..`), not
+  from `$CLAUDE_PROJECT_DIR` in the command line: the shell expands that variable, and on
+  Windows the path breaks.
 
-## Як перевірити
+## How to check
 
 ```bash
-npm run hooks:test                                  # self-тести всіх хуків; входить у verify
-node .claude/hooks/guard-bash.mjs --self-test       # один хук
+npm run hooks:test                                  # self-tests of all hooks; part of verify
+node .claude/hooks/guard-bash.mjs --self-test       # a single hook
 printf '{"tool_input":{"command":"git push"}}' | RALPH_FEATURE=x node .claude/hooks/guard-bash.mjs
 ```
 
-Self-тести детерміновані: без моделі, без мережі, 0 токенів. Логіка вердикту кожного хука —
-чиста функція `decide()`, тому тестується без спавну процесів і без git-стану.
+The self-tests are deterministic: no model, no network, 0 tokens. Each hook's verdict logic
+is a pure `decide()` function, so it is tested without spawning processes or touching git state.
 
-## Як додати новий хук
+## How to add a new hook
 
-1. Скопіюй скелет будь-якого guard-а: `decide()` (чиста функція) + `runSelfTest()` +
-   `main()` з `readStdinJson`/`deny`/`allow` з [lib.mjs](./lib.mjs). Тримай інваріанти вище —
-   особливо fail-open і споживання stdin.
-2. Додай файл у список `HOOKS` у [self-test.mjs](./self-test.mjs) — інакше ворота його не бачать.
-3. Зареєструй подію в [`.claude/settings.json`](../settings.json) (для `PreToolUse`/`PostToolUse`
-   не забудь `matcher`).
-4. Допиши рядок у таблиці тут і в [AGENTS.md](../../AGENTS.md#хуки-claude-code).
-5. `npm run verify` — усе має бути зеленим з чистого клону, без нових залежностей.
+1. Copy the skeleton of any guard: `decide()` (pure function) + `runSelfTest()` + `main()`
+   with `readStdinJson`/`deny`/`allow` from [lib.mjs](./lib.mjs). Keep the invariants above —
+   especially fail-open and draining stdin.
+2. Add the file to the `HOOKS` list in [self-test.mjs](./self-test.mjs) — otherwise the gate
+   does not see it.
+3. Register the event in [`.claude/settings.json`](../settings.json) (for
+   `PreToolUse`/`PostToolUse` do not forget the `matcher`).
+4. Add a row to the table here and in [AGENTS.md](../../AGENTS.md#hooks-claude-code).
+5. `npm run verify` — everything must be green from a fresh clone, with no new dependencies.
 
-## Якщо хук заблокував тебе (людину)
+## If a hook blocked you (a human)
 
-- Перевір, чи не висить `RALPH_FEATURE` у середовищі — поза лупом її бути не мусить.
-- Коміт на `main` і `--no-verify` заблоковані свідомо для всіх: створи гілку / прибери прапорець.
-- Хук поводиться неправильно — виправ його і додай кейс у self-test; у луп-режимі агент
-  зробити цього не може (самозахист), людина в інтерактиві — може.
+- Check that `RALPH_FEATURE` is not lingering in your environment — outside the loop it must
+  not be set.
+- Commits on `main` and `--no-verify` are blocked for everyone on purpose: create a branch /
+  drop the flag.
+- If a hook misbehaves — fix it and add the case to its self-test; in loop mode the agent
+  cannot do that (self-protection), a human in an interactive session can.
 
-⚠ В інтерактивному Claude Code новий/змінений хук набирає чинності після перезапуску сесії
-і одноразового підтвердження людиною. Headless-луп (`npm run ralph`) ганяє хуки без питань.
+⚠ In interactive Claude Code a new or changed hook takes effect after a session restart and
+a one-time human confirmation. The headless loop (`npm run ralph`) runs hooks without asking.

@@ -131,29 +131,29 @@ npm run ralph -- --feature qr-codes            # справжній прогін
 **Стеля автономії — коміт у локальну гілку.** `git push` і `git checkout main` заборонені.
 Подробиці, коди виходу й агент-агностика — [loop/README.md](loop/README.md).
 
-## Хуки (Claude Code)
+## Hooks (Claude Code)
 
-Заборони з промптів додатково стережуть **хуки** — скрипти в `.claude/hooks/`, які Claude Code
-запускає сам на подіях сесії (реєстр — `.claude/settings.json`). Промпт лишається першим шаром
-і єдиним для не-Claude агентів; хук — детермінований другий. Відмова інструмента з причиною —
-це спрацювання запобіжника, а не збій.
+The prompt prohibitions are additionally enforced by **hooks** — scripts in `.claude/hooks/`
+that Claude Code runs itself on session events (registry — `.claude/settings.json`). The
+prompt stays the first layer and the only one for non-Claude agents; the hook is the
+deterministic second. A tool refusal with a reason is a safeguard tripping, not a malfunction.
 
-| Подія | Файл | Що стереже |
+| Event | File | What it guards |
 |---|---|---|
-| `SessionStart` | `loop-memory.mjs` | вливає журнал лупа + факти з git/трекера в контекст ітерації |
-| `PreToolUse` (Bash) | `guard-bash.mjs` | у лупі: `git push`, перемикання гілок, нові npm-залежності, трейлер `SDD-Task:`; завжди: коміт на `main`, `--no-verify` |
-| `PreToolUse` (Edit/Write) | `guard-files.mjs` | `docs/roadmap.md`; `DONE` проти трекера; у лупі — самі хуки й `settings.json` |
-| `PostToolUse` (Edit/Write) | `post-edit.mjs` | одразу після правки: посилання в `*.md` (`links:check --file`), ESLint по зміненому файлу |
-| `Stop` | `stop-journal.mjs` | у лупі: хід не завершується, доки не дописано `loop/JOURNAL.md` |
+| `SessionStart` | `loop-memory.mjs` | injects the loop journal + git/tracker facts into the iteration's context |
+| `PreToolUse` (Bash) | `guard-bash.mjs` | in the loop: `git push`, branch switching, new npm dependencies, the `SDD-Task:` trailer; always: committing on `main`, `--no-verify` |
+| `PreToolUse` (Edit/Write) | `guard-files.mjs` | `docs/roadmap.md`; `DONE` against the tracker; in the loop — the hooks themselves and `settings.json` |
+| `PostToolUse` (Edit/Write) | `post-edit.mjs` | right after an edit: links in `*.md` (`links:check --file`), ESLint on the changed file |
+| `Stop` | `stop-journal.mjs` | in the loop: the turn does not end until `loop/JOURNAL.md` is appended |
 
-Строгість залежить від режиму: `RALPH_FEATURE` (виставляє ранер лупа) вмикає повну стелю;
-в інтерактиві людини діють лише універсальні запобіжники. Самоперевірка без токенів і моделі —
-`npm run hooks:test` (входить у `verify`); кожен хук ганяється й руками:
-`node .claude/hooks/<file>.mjs --self-test`.
+Strictness depends on the mode: `RALPH_FEATURE` (set by the loop runner) enables the full
+ceiling; a human's interactive session keeps only the universal safeguards. Self-check with
+zero tokens and no model — `npm run hooks:test` (part of `verify`); each hook also runs by
+hand: `node .claude/hooks/<file>.mjs --self-test`.
 
-Як влаштовано, як додати новий хук і що робити, коли хук заблокував тебе, —
-[.claude/hooks/README.md](.claude/hooks/README.md). Чому саме хуки і чому промпти
-лишаються — [ADR 0003](docs/adr/0003-hooks-enforce-agent-prohibitions.md).
+How it works, how to add a new hook, and what to do when a hook blocks you —
+[.claude/hooks/README.md](.claude/hooks/README.md). Why hooks, and why the prompts stay —
+[ADR 0003](docs/adr/0003-hooks-enforce-agent-prohibitions.md).
 
 ## Де що лежить
 

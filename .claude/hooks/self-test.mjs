@@ -1,8 +1,8 @@
-// self-test.mjs — жене --self-test усіх хуків. Ворота `npm run hooks:test`.
+// self-test.mjs — runs --self-test for every hook. The `npm run hooks:test` gate.
 //
-// Кожен хук тестується як окремий процес — так, як його запускає Claude Code. Тести
-// детерміновані: без моделі, без мережі, без stdin. Зникне хук із цього списку — ворота
-// почервоніють (той самий принцип, що у verify: відсутня перевірка — це провал, не пропуск).
+// Each hook is tested as a separate process — the way Claude Code launches it. The tests
+// are deterministic: no model, no network, no stdin. If a hook disappears from this list,
+// the gate turns red (the same principle as verify: a missing check is a failure, not a skip).
 
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,17 +11,18 @@ import { run } from './lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-// Явний список, не readdir: хук, доданий у теку, але забутий тут І в settings.json,
-// однаково мертвий — а readdir приховав би різницю між «тестується» і «випадково лежить».
+// An explicit list, not readdir: a hook dropped into the directory but forgotten here AND
+// in settings.json is dead either way — and readdir would hide the difference between
+// "tested" and "happens to be lying around".
 const HOOKS = ['guard-bash.mjs', 'guard-files.mjs', 'post-edit.mjs', 'stop-journal.mjs'];
 
 let failed = 0;
-console.log('\nhooks:test — self-тести хуків, 0 токенів');
+console.log('\nhooks:test — hook self-tests, 0 tokens');
 
 for (const hook of HOOKS) {
   const path = join(HERE, hook);
   if (!existsSync(path)) {
-    console.error(`  ✗ ${hook}: файла немає — хук зник, а settings.json досі на нього вказує`);
+    console.error(`  ✗ ${hook}: file is missing — the hook is gone while settings.json still points at it`);
     failed += 1;
     continue;
   }
@@ -32,8 +33,8 @@ for (const hook of HOOKS) {
 
 console.log('');
 if (failed > 0) {
-  console.error(`hooks:test FAIL — ${failed} з ${HOOKS.length} хуків червоні.`);
+  console.error(`hooks:test FAIL — ${failed} of ${HOOKS.length} hooks are red.`);
   process.exit(1);
 }
-console.log(`hooks:test OK — ${HOOKS.length} хуків.`);
+console.log(`hooks:test OK — ${HOOKS.length} hooks.`);
 process.exit(0);

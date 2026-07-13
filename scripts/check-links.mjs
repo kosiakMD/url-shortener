@@ -12,7 +12,7 @@
 //   3. Кожен `#якір` збігається із заголовком у файлі-цілі (за правилами GitHub).
 //
 //   npm run links:check
-//   npm run links:check -- --file docs/roadmap.md   # лише один файл (так кличе post-edit хук)
+//   npm run links:check -- --file docs/roadmap.md   # a single file (how the post-edit hook calls it)
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, dirname, extname } from 'node:path';
@@ -112,9 +112,9 @@ let links = 0;
 let wikilinks = 0;
 let broken = 0;
 
-// `--file <шлях>` — перевірити ОДИН файл (так кличе PostToolUse-хук post-edit.mjs одразу
-// після правки). Винятки ті самі, що й у повному обході: шаблони й журнал не перевіряємо —
-// файл поза юрисдикцією воріт дає мовчазний OK, а не хибний провал.
+// `--file <path>` — check a SINGLE file (how the PostToolUse hook post-edit.mjs calls this
+// right after an edit). Exclusions match the full walk: templates and the journal are
+// skipped — a file outside the gate's jurisdiction gets a silent OK, not a false failure.
 const fileFlag = process.argv.indexOf('--file');
 const single = fileFlag !== -1 ? resolve(REPO, process.argv[fileFlag + 1] ?? '') : null;
 

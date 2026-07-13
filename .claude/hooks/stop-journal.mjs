@@ -1,19 +1,20 @@
-// stop-journal.mjs — «останній крок ходу — запиши, що сталось» (подія Stop).
+// stop-journal.mjs — "the turn's last step is to write down what happened" (Stop event).
 //
-// loop/PROMPT.md вимагає наприкінці КОЖНОГО ходу дописати loop/JOURNAL.md — це єдиний
-// канал пам'яті між ітераціями сліпого лупа. Хід, який мовчки завершився, змушує наступну
-// ітерацію повторити ту саму помилку. Дотепер це тримали на слухняності моделі.
+// loop/PROMPT.md requires appending to loop/JOURNAL.md at the end of EVERY turn — it is the
+// only memory channel between iterations of the blind loop. A turn that ends silently forces
+// the next iteration to repeat the same mistake. Until now this relied on model obedience.
 //
-// Механіка: на SessionStart loop-memory.mjs записує розмір журналу в tmp/journal-baseline.
-// Цей хук на Stop порівнює: журнал не виріс → блокує завершення (exit 2) з нагадуванням.
+// Mechanics: on SessionStart loop-memory.mjs writes the journal size to tmp/journal-baseline.
+// On Stop this hook compares: the journal did not grow → block the stop (exit 2) with a reminder.
 //
-// Запобіжник від зациклення — поле `stop_hook_active` від Claude Code: воно true, коли
-// агент продовжив роботу саме через блок Stop-хука. Другий раз поспіль не блокуємо:
-// агент, якому СПРАВДІ нема чого писати, не має висіти в нескінченному циклі.
+// The anti-looping safeguard is Claude Code's `stop_hook_active` field: it is true when the
+// agent kept working precisely because a Stop hook blocked it. We never block twice in a row:
+// an agent that TRULY has nothing to write must not hang in an endless cycle.
 //
-// Поза луп-режимом (немає RALPH_FEATURE) хук мовчить: людині в інтерактиві журнал не потрібен.
+// Outside loop mode (no RALPH_FEATURE) the hook is silent: a human in an interactive
+// session needs no journal.
 //
-// Перевірити руками:
+// Check by hand:
 //   printf '{}' | RALPH_FEATURE=x node .claude/hooks/stop-journal.mjs
 //   node .claude/hooks/stop-journal.mjs --self-test
 
@@ -22,31 +23,31 @@ import { join } from 'node:path';
 import { readStdinJson, deny, allow, hookRoot, loopSlug, selfTest, isMain } from './lib.mjs';
 
 /**
- * Вердикт. Чиста функція — її ганяє self-test.
- * @returns {string|null} причина блокування або null
+ * Verdict. Pure function — this is what the self-test runs.
+ * @returns {string|null} the reason to block, or null
  */
 export function decide({ loop, stopHookActive, baseline, currentSize }) {
   if (!loop) return null;
-  if (stopHookActive) return null; // уже блокували цей стоп — не зациклюємо
-  if (baseline === null) return null; // бейслайна немає (хід поза ралфом?) — fail-open
+  if (stopHookActive) return null; // this stop was already blocked once — do not loop
+  if (baseline === null) return null; // no baseline (a turn outside ralph?) — fail open
   if (currentSize > baseline) return null;
   return [
-    'Хід не дописав loop/JOURNAL.md — а це єдине, що наступна ітерація від тебе почує',
-    '(loop/PROMPT.md §Останній крок ходу). Допиши в кінець файла блок:',
-    '### Ітерація <N> — <id задачі> · **Зробив:** … · **Спіткнувся:** … · **Наступному ходу:** …',
-    'Пиши і тоді, коли прогресу не було — особливо тоді.',
+    'The turn did not append to loop/JOURNAL.md — and that is the only thing the next',
+    'iteration will hear from you (loop/PROMPT.md, "the turn\'s last step"). Append a block:',
+    '### Iteration <N> — <task id> · **Did:** … · **Stumbled on:** … · **For the next turn:** …',
+    'Write it even when there was no progress — especially then.',
   ].join('\n');
 }
 
 function runSelfTest() {
   const failures = selfTest('stop-journal', [
-    { desc: 'поза лупом', actual: decide({ loop: false, stopHookActive: false, baseline: 0, currentSize: 0 }), expected: null },
-    { desc: 'журнал не виріс', actual: decide({ loop: true, stopHookActive: false, baseline: 100, currentSize: 100 }) !== null, expected: true },
-    { desc: 'журнал зменшився (переписали?)', actual: decide({ loop: true, stopHookActive: false, baseline: 100, currentSize: 40 }) !== null, expected: true },
-    { desc: 'журнал виріс', actual: decide({ loop: true, stopHookActive: false, baseline: 100, currentSize: 260 }), expected: null },
-    { desc: 'перший запис у порожній', actual: decide({ loop: true, stopHookActive: false, baseline: 0, currentSize: 50 }), expected: null },
-    { desc: 'другий блок поспіль — пропустити', actual: decide({ loop: true, stopHookActive: true, baseline: 100, currentSize: 100 }), expected: null },
-    { desc: 'без бейслайна — fail-open', actual: decide({ loop: true, stopHookActive: false, baseline: null, currentSize: 100 }), expected: null },
+    { desc: 'outside loop', actual: decide({ loop: false, stopHookActive: false, baseline: 0, currentSize: 0 }), expected: null },
+    { desc: 'journal did not grow', actual: decide({ loop: true, stopHookActive: false, baseline: 100, currentSize: 100 }) !== null, expected: true },
+    { desc: 'journal shrank (rewritten?)', actual: decide({ loop: true, stopHookActive: false, baseline: 100, currentSize: 40 }) !== null, expected: true },
+    { desc: 'journal grew', actual: decide({ loop: true, stopHookActive: false, baseline: 100, currentSize: 260 }), expected: null },
+    { desc: 'first entry into an empty journal', actual: decide({ loop: true, stopHookActive: false, baseline: 0, currentSize: 50 }), expected: null },
+    { desc: 'second block in a row — skip', actual: decide({ loop: true, stopHookActive: true, baseline: 100, currentSize: 100 }), expected: null },
+    { desc: 'no baseline — fail-open', actual: decide({ loop: true, stopHookActive: false, baseline: null, currentSize: 100 }), expected: null },
   ]);
   process.exit(failures === 0 ? 0 : 1);
 }
@@ -73,7 +74,7 @@ async function main() {
     });
     if (reason) deny(reason);
   } catch (err) {
-    process.stderr.write(`stop-journal: власна помилка, пропускаю (${err?.message})\n`);
+    process.stderr.write(`stop-journal: internal error, allowing (${err?.message})\n`);
   }
   allow();
 }

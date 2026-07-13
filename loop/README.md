@@ -170,11 +170,13 @@ approval». Виміряно живим прогоном: агент чесно 
 Стеля автономії тепер тримається на **відмові**, а не на дії.
 
 Стеля лишається та сама — **коміт у локальну гілку**. `git push` і `git checkout main`
-заборонені промптом, а в Claude Code — ще й **механічно**: PreToolUse-хук
-[guard-bash.mjs](../.claude/hooks/guard-bash.mjs) перехоплює команду до виконання і відмовляє
-з причиною (у луп-режимі, коли ранер виставив `RALPH_FEATURE`). Промпт лишається другим шаром —
-його читають і не-Claude агенти, у яких хуків немає. Найгірше, що може статися за ніч, —
-смітна локальна гілка, яку видаляють одним рядком.
+заборонені промптом. Найгірше, що може статися за ніч, — смітна локальна гілка, яку видаляють
+одним рядком.
+
+In Claude Code the same ceiling also holds **mechanically**: the PreToolUse hook
+[guard-bash.mjs](../.claude/hooks/guard-bash.mjs) intercepts the command before it runs and
+denies it with a reason (in loop mode, when the runner has set `RALPH_FEATURE`). The prompt
+remains the second layer — non-Claude agents, which have no hooks, still read it.
 
 Брудне робоче дерево справжній прогін відмовляється чіпати: `exit 2`, доки не передано
 `--allow-dirty`. Перевірка `main` від `--allow-dirty` **не залежить**: обійти її можна лише
